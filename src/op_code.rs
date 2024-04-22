@@ -1,15 +1,26 @@
 use literify::literify;
+use nom::{character::complete::alpha1, combinator::map_opt, IResult};
 use phf::phf_map;
+
+impl OpCode {
+    pub fn parse(input: &str) -> IResult<&str, Self> {
+        map_opt(alpha1, |s| OP_CODE.get(s).copied())(input)
+    }
+}
 
 macro_rules! mask {
     (R, $opcode:literal, $f3:literal, $f7:literal) => {
         (($f7 & 0x7f) << 25) | (($f3 & 0x7) << 12) | ($opcode & 0x7f)
     };
+    (I, $opcode:literal, $f3:literal) => {
+        (($f3 & 0x7) << 12) | ($opcode & 0x7f)
+    };
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OpCodeTy {
     R,
+    I,
 }
 
 macro_rules! op_code {
@@ -34,7 +45,7 @@ macro_rules! op_code {
         }
 
         literify! {
-            pub static INSTR: phf::Map<&'static str, OpCode> = phf_map! {
+            static OP_CODE: phf::Map<&'static str, OpCode> = phf_map! {
                 $(
                     ~($name) => OpCode::$name,
                 )+
@@ -55,4 +66,5 @@ op_code! {
     sra     : R, 0x33, 0x5, 0x20;
     slt     : R, 0x33, 0x2, 0x00;
     sltu    : R, 0x33, 0x3, 0x00;
+    addi    : I, 0x13, 0x0;
 }

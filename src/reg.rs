@@ -1,11 +1,16 @@
+use nom::{character::complete::alphanumeric1, combinator::map_opt, IResult};
 use phf::phf_map;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Reg(pub u32);
 
 impl Reg {
     pub fn code(&self, shift: u32) -> u32 {
-        (self.0 & 31) << shift
+        (self.0 & 0x1f) << shift
+    }
+
+    pub fn parse(input: &str) -> IResult<&str, Self> {
+        map_opt(alphanumeric1, |s| REGS.get(s).copied().map(Into::into))(input)
     }
 }
 

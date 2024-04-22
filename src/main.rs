@@ -1,7 +1,8 @@
-use riscv_asm::parser::Program;
+use riscv_asm::program::Program;
 
 fn main() {
     let program = r#"
+mv  a0, zero
 add s2, s3, s4
 sub t0, t1, t2
     "#;

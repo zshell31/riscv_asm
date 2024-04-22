@@ -1,3 +1,6 @@
+pub mod imm;
+pub mod instr;
 pub mod op_code;
-pub mod parser;
+pub mod program;
+pub mod pseudo;
 pub mod reg;
