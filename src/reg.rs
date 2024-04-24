@@ -1,12 +1,27 @@
+use std::fmt::{self, Debug, Display};
+
 use nom::{character::complete::alphanumeric1, combinator::map_opt, IResult};
 use phf::phf_map;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
+#[repr(transparent)]
 pub struct Reg(pub u32);
 
+impl Display for Reg {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(reg_name(self.0))
+    }
+}
+
+impl Debug for Reg {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Display::fmt(self, f)
+    }
+}
+
 impl Reg {
-    pub fn code(&self, shift: u32) -> u32 {
-        (self.0 & 0x1f) << shift
+    pub fn idx(&self) -> u32 {
+        self.0
     }
 
     pub fn parse(input: &str) -> IResult<&str, Self> {
@@ -20,7 +35,27 @@ impl From<u32> for Reg {
     }
 }
 
-pub static REGS: phf::Map<&'static str, u32> = phf_map! {
+macro_rules! regs {
+    ($($name:literal => $idx:literal),+) => {
+        pub static REGS: phf::Map<&'static str, u32> = phf_map! {
+            $(
+                $name => $idx,
+            )+
+        };
+
+        fn reg_name(idx: u32) -> &'static str {
+            #[allow(unreachable_patterns)]
+            match idx {
+                $(
+                    $idx => $name,
+                )+
+                _ => unreachable!()
+            }
+        }
+    };
+}
+
+regs! {
     "zero"  => 0,   // x0 - Zero constant
     "ra"    => 1,   // x1 - Return address
     "sp"    => 2,   // x2 - Stack pointer
@@ -54,4 +89,4 @@ pub static REGS: phf::Map<&'static str, u32> = phf_map! {
     "t4"    => 29,  // x29 - Temporary
     "t5"    => 30,  // x30 - Temporary
     "t6"    => 31   // x31 = Temporary
-};
+}

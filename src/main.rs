@@ -1,14 +1,13 @@
 use riscv_asm::program::Program;
 
-fn main() {
-    let program = r#"
-mv  a0, zero
-add s2, s3, s4
-sub t0, t1, t2
-    "#;
+fn main() -> anyhow::Result<()> {
+    let program = Program::parse(
+        r#"
+start:      mv a0, zero
+counter:    addi a0, a0, 1
+            beq zero, zero, counter
+    "#,
+    )?;
 
-    match Program::parse(program) {
-        Ok(program) => println!("{program}"),
-        Err(e) => eprintln!("error: {e}"),
-    };
+    program.dump_code()
 }
