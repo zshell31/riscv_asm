@@ -1,12 +1,15 @@
 pub use literify::literify;
-use nom::{character::complete::alpha0, combinator::map_opt, IResult};
+use nom::{character::complete::alpha0, combinator::map_opt};
 pub use phf::phf_map;
 
-use crate::op_code::OpCode;
+use crate::{
+    op_code::OpCode,
+    span::{IResult, Span},
+};
 
 impl Pseudo {
-    pub fn parse(input: &str) -> IResult<&str, Self> {
-        map_opt(alpha0, |s| PSEUDO.get(s).copied())(input)
+    pub fn parse(input: Span<'_>) -> IResult<Self> {
+        map_opt(alpha0, |s: Span<'_>| PSEUDO.get(*s).copied())(input)
     }
 }
 

@@ -3,11 +3,17 @@ use nom::{
     character::complete::{char, space0, space1},
     combinator::map,
     sequence::{delimited, terminated},
-    IResult,
 };
 use std::fmt::Debug;
 
-use crate::{imm::Imm, op_code::OpCode, program::Program, pseudo::Pseudo, reg::Reg};
+use crate::{
+    imm::Imm,
+    op_code::OpCode,
+    program::Program,
+    pseudo::Pseudo,
+    reg::Reg,
+    span::{IResult, Span},
+};
 
 macro_rules! parse_ops {
     ($input:ident as $name0:ident => $parser0:expr $(,$name:ident => $parser:expr)* $(,)?) => {
@@ -26,14 +32,14 @@ pub struct Instr {
 }
 
 impl Instr {
-    pub fn parse(input: &str) -> IResult<&str, Self> {
+    pub fn parse(input: Span<'_>) -> IResult<Self> {
         let (input, this) = alt((Self::parse_pseudo, Self::parse_instr))(input)?;
         let (input, _) = space0(input)?;
 
         Ok((input, this))
     }
 
-    fn parse_pseudo(input: &str) -> IResult<&str, Self> {
+    fn parse_pseudo(input: Span<'_>) -> IResult<Self> {
         let (input, pseudo) = terminated(Pseudo::parse, space1)(input)?;
 
         let op_code = pseudo.op_code();
@@ -53,7 +59,7 @@ impl Instr {
         }
     }
 
-    fn parse_pseudo_rd_rs(input: &str) -> IResult<&str, (Reg, Reg)> {
+    fn parse_pseudo_rd_rs(input: Span<'_>) -> IResult<(Reg, Reg)> {
         parse_ops! {
             input as
             rd => Reg::parse,
@@ -63,7 +69,7 @@ impl Instr {
         Ok((input, (rd, rs)))
     }
 
-    fn parse_instr(input: &str) -> IResult<&str, Self> {
+    fn parse_instr(input: Span<'_>) -> IResult<Self> {
         let (input, op_code) = terminated(OpCode::parse, space1)(input)?;
         let (input, operands) = op_code.kind().parse(input)?;
 
@@ -92,7 +98,7 @@ macro_rules! op_kind {
         }
 
         impl $name {
-            pub fn parse(input: &str) -> IResult<&str, Self> {
+            pub fn parse(input: Span<'_>) -> IResult<Self> {
                 parse_ops!(
                     input as
                     $(
@@ -126,7 +132,7 @@ macro_rules! ops {
         }
 
         impl OpKind {
-            pub fn parse<'i>(&self, input: &'i str) -> IResult<&'i str, Operands> {
+            pub fn parse<'i>(&self, input: Span<'i>) -> IResult<'i, Operands> {
                 match self {
                     $(
                         Self::$kind => map($name::parse, Operands::$kind)(input),

@@ -9,10 +9,12 @@ use nom::{
     character::complete::{digit1, hex_digit1, oct_digit1},
     combinator::{map, map_res, peek},
     sequence::preceded,
-    IResult,
 };
 
-use crate::program::Program;
+use crate::{
+    program::Program,
+    span::{IResult, Span},
+};
 
 #[derive(Clone)]
 pub enum Imm {
@@ -41,23 +43,26 @@ impl From<i32> for Imm {
     }
 }
 
-pub fn parse_sym(input: &str) -> IResult<&str, &str> {
-    preceded(
-        peek(take_while_m_n(
-            1,
-            1,
-            |c| matches!(c, 'a'..='z' | 'A'..='Z' | '_'),
-        )),
-        take_while1(|c| matches!(c, '0'..='9' | 'a'..='z' | 'A'..='Z' | '_')),
+pub fn parse_sym(input: Span<'_>) -> IResult<&'_ str> {
+    map(
+        preceded(
+            peek(take_while_m_n(
+                1,
+                1,
+                |c| matches!(c, 'a'..='z' | 'A'..='Z' | '_'),
+            )),
+            take_while1(|c| matches!(c, '0'..='9' | 'a'..='z' | 'A'..='Z' | '_')),
+        ),
+        |s: Span<'_>| *s,
     )(input)
 }
 
 impl Imm {
-    pub fn parse(input: &str) -> IResult<&str, Self> {
+    pub fn parse(input: Span<'_>) -> IResult<Self> {
         alt((Self::parse_sym, Self::parse_imm))(input)
     }
 
-    pub fn parse_imm(input: &str) -> IResult<&str, Self> {
+    pub fn parse_imm(input: Span<'_>) -> IResult<Self> {
         map(
             alt((
                 Self::parse_decimal,
@@ -69,36 +74,36 @@ impl Imm {
         )(input)
     }
 
-    pub fn parse_sym(input: &str) -> IResult<&str, Self> {
+    pub fn parse_sym(input: Span<'_>) -> IResult<Self> {
         map(parse_sym, |sym: &str| Self::Sym(Rc::new(sym.to_string())))(input)
     }
 
-    fn parse_decimal(input: &str) -> IResult<&str, i32> {
+    fn parse_decimal(input: Span<'_>) -> IResult<i32> {
         map_res(
             preceded(
                 peek(take_while_m_n(1, 1, |c| matches!(c, '1'..='9'))),
                 digit1,
             ),
-            |s: &str| s.parse::<i32>(),
+            |s: Span<'_>| s.parse::<i32>(),
         )(input)
     }
 
-    fn parse_hex(input: &str) -> IResult<&str, i32> {
-        map_res(preceded(tag("0x"), hex_digit1), |s: &str| {
-            i32::from_str_radix(s, 16)
+    fn parse_hex(input: Span<'_>) -> IResult<i32> {
+        map_res(preceded(tag("0x"), hex_digit1), |s: Span<'_>| {
+            i32::from_str_radix(*s, 16)
         })(input)
     }
 
-    fn parse_bin(input: &str) -> IResult<&str, i32> {
-        map_res(preceded(tag("0b"), oct_digit1), |s: &str| {
-            i32::from_str_radix(s, 2)
+    fn parse_bin(input: Span<'_>) -> IResult<i32> {
+        map_res(preceded(tag("0b"), oct_digit1), |s: Span<'_>| {
+            i32::from_str_radix(*s, 2)
         })(input)
     }
 
-    fn parse_octal(input: &str) -> IResult<&str, i32> {
+    fn parse_octal(input: Span<'_>) -> IResult<i32> {
         map_res(
             preceded(tag("0"), take_while1(|c| matches!(c, '0'..='7'))),
-            |s: &str| i32::from_str_radix(s, 8),
+            |s: Span<'_>| i32::from_str_radix(*s, 8),
         )(input)
     }
 
@@ -108,9 +113,4 @@ impl Imm {
             Self::Sym(sym) => program.resolve(sym),
         }
     }
-
-    // pub fn mask(&self, program: &Program, shift: u32) -> anyhow::Result<u32> {
-    //
-    //     (self.0 & 0xfff) << shift
-    // }
 }

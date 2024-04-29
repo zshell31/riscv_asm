@@ -6,12 +6,15 @@ use nom::{
     bytes::complete::{take_until, take_while},
     character::complete::{anychar, char, multispace0, space0, space1},
     combinator::{eof, map, opt, rest},
-    error::Error,
     sequence::{pair, preceded, terminated},
-    Finish, IResult,
+    Finish,
 };
 
-use crate::{imm::parse_sym, instr::Instr};
+use crate::{
+    imm::parse_sym,
+    instr::Instr,
+    span::{IResult, Span},
+};
 
 #[derive(Debug, Default)]
 pub struct Program {
@@ -62,31 +65,13 @@ impl Program {
     }
 }
 
-// impl Display for Program {
-//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//         for (addr, code) in self.code.iter().enumerate() {
-//             writeln!(
-//                 f,
-//                 "{:08x}:  {:02x} {:02x} {:02x} {:02x}",
-//                 addr << 2,
-//                 (code >> 24) & 0xff,
-//                 (code >> 16) & 0xff,
-//                 (code >> 8) & 0xff,
-//                 code & 0xff
-//             )?;
-//         }
-
-//         Ok(())
-//     }
-// }
-
 enum Line {
     Instr(Instr),
     Label(String, Option<Instr>),
 }
 
 impl Line {
-    fn parse(input: &str) -> IResult<&str, Self> {
+    fn parse(input: Span<'_>) -> IResult<Self> {
         map(
             pair(
                 alt((Self::parse_instr, Self::parse_label)),
@@ -96,11 +81,11 @@ impl Line {
         )(input)
     }
 
-    fn parse_instr(input: &str) -> IResult<&str, Self> {
+    fn parse_instr(input: Span<'_>) -> IResult<Self> {
         map(Instr::parse, Self::Instr)(input)
     }
 
-    fn parse_label(input: &str) -> IResult<&str, Self> {
+    fn parse_label(input: Span<'_>) -> IResult<Self> {
         map(
             pair(
                 terminated(parse_sym, char(':')),
@@ -110,18 +95,23 @@ impl Line {
         )(input)
     }
 
-    fn parse_comment(input: &str) -> IResult<&str, ()> {
+    fn parse_comment(input: Span<'_>) -> IResult<()> {
         map(preceded(char('#'), anychar), |_| ())(input)
     }
 }
 
 impl Program {
-    pub fn parse(input: &str) -> Result<Self, Error<&str>> {
+    pub fn parse(input: &str) -> anyhow::Result<Self> {
+        let spanned_input = Span::new(input, true);
         let mut program = Self::default();
-        program.parse_code(input).finish().map(|_| program)
+        program
+            .parse_code(spanned_input)
+            .finish()
+            .map(|_| program)
+            .map_err(|e| anyhow!("{e:#?}"))
     }
 
-    fn parse_code<'i>(&mut self, input: &'i str) -> IResult<&'i str, ()> {
+    fn parse_code<'i>(&mut self, input: Span<'i>) -> IResult<'i, ()> {
         let (mut input, _) = multispace0(input)?;
         loop {
             if input.is_empty() {
