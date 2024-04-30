@@ -1,7 +1,4 @@
-use std::{
-    fmt::{self, Debug, Display},
-    rc::Rc,
-};
+use std::fmt::Debug;
 
 use nom::{
     branch::alt,
@@ -13,28 +10,13 @@ use nom::{
 
 use crate::{
     program::Program,
-    span::{IResult, Span},
+    span::{IResult, Offset, Span},
 };
 
-#[derive(Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum Imm {
     Val(i32),
-    Sym(Rc<String>),
-}
-
-impl Display for Imm {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Val(val) => Display::fmt(val, f),
-            Self::Sym(sym) => Display::fmt(sym, f),
-        }
-    }
-}
-
-impl Debug for Imm {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        Display::fmt(self, f)
-    }
+    Sym(Offset),
 }
 
 impl From<i32> for Imm {
@@ -43,17 +25,14 @@ impl From<i32> for Imm {
     }
 }
 
-pub fn parse_sym(input: Span<'_>) -> IResult<&'_ str> {
-    map(
-        preceded(
-            peek(take_while_m_n(
-                1,
-                1,
-                |c| matches!(c, 'a'..='z' | 'A'..='Z' | '_'),
-            )),
-            take_while1(|c| matches!(c, '0'..='9' | 'a'..='z' | 'A'..='Z' | '_')),
-        ),
-        |s: Span<'_>| *s,
+pub fn parse_sym(input: Span<'_>) -> IResult<Span<'_>> {
+    preceded(
+        peek(take_while_m_n(
+            1,
+            1,
+            |c| matches!(c, 'a'..='z' | 'A'..='Z' | '_'),
+        )),
+        take_while1(|c| matches!(c, '0'..='9' | 'a'..='z' | 'A'..='Z' | '_')),
     )(input)
 }
 
@@ -75,7 +54,7 @@ impl Imm {
     }
 
     pub fn parse_sym(input: Span<'_>) -> IResult<Self> {
-        map(parse_sym, |sym: &str| Self::Sym(Rc::new(sym.to_string())))(input)
+        map(parse_sym, |sym| Self::Sym(sym.into()))(input)
     }
 
     fn parse_decimal(input: Span<'_>) -> IResult<i32> {

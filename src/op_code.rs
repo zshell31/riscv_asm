@@ -3,12 +3,15 @@ use crate::{
     span::{IResult, Span},
 };
 use literify::literify;
-use nom::{character::complete::alpha1, combinator::map_opt};
+use nom::{character::complete::alpha1, combinator::map_opt, error::context};
 use phf::phf_map;
 
 impl OpCode {
     pub fn parse(input: Span<'_>) -> IResult<Self> {
-        map_opt(alpha1, |s: Span<'_>| OP_CODE.get(*s).copied())(input)
+        context(
+            "OpCode",
+            map_opt(alpha1, |s: Span<'_>| OP_CODE.get(*s).copied()),
+        )(input)
     }
 }
 

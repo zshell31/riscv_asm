@@ -1,6 +1,6 @@
 use std::fmt::{self, Debug, Display};
 
-use nom::{character::complete::alphanumeric1, combinator::map_opt};
+use nom::{character::complete::alphanumeric1, combinator::map_opt, error::context};
 use phf::phf_map;
 
 use crate::span::{IResult, Span};
@@ -27,9 +27,12 @@ impl Reg {
     }
 
     pub fn parse(input: Span<'_>) -> IResult<Self> {
-        map_opt(alphanumeric1, |s: Span<'_>| {
-            REGS.get(*s).copied().map(Into::into)
-        })(input)
+        context(
+            "Reg",
+            map_opt(alphanumeric1, |s: Span<'_>| {
+                REGS.get(*s).copied().map(Into::into)
+            }),
+        )(input)
     }
 }
 

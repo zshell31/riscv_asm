@@ -1,5 +1,5 @@
 pub use literify::literify;
-use nom::{character::complete::alpha0, combinator::map_opt};
+use nom::{character::complete::alpha0, combinator::map_opt, error::context};
 pub use phf::phf_map;
 
 use crate::{
@@ -9,7 +9,10 @@ use crate::{
 
 impl Pseudo {
     pub fn parse(input: Span<'_>) -> IResult<Self> {
-        map_opt(alpha0, |s: Span<'_>| PSEUDO.get(*s).copied())(input)
+        context(
+            "Pseudo",
+            map_opt(alpha0, |s: Span<'_>| PSEUDO.get(*s).copied()),
+        )(input)
     }
 }
 

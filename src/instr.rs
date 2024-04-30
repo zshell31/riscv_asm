@@ -1,7 +1,8 @@
 use nom::{
     branch::alt,
     character::complete::{char, space0, space1},
-    combinator::map,
+    combinator::{cut, map},
+    error::context,
     sequence::{delimited, terminated},
 };
 use std::fmt::Debug;
@@ -43,7 +44,7 @@ impl Instr {
         let (input, pseudo) = terminated(Pseudo::parse, space1)(input)?;
 
         let op_code = pseudo.op_code();
-        match pseudo {
+        cut(move |input| match pseudo {
             Pseudo::mv => {
                 assert_eq!(op_code.kind(), OpKind::I);
 
@@ -56,7 +57,7 @@ impl Instr {
                     }),
                 })(input)
             }
-        }
+        })(input)
     }
 
     fn parse_pseudo_rd_rs(input: Span<'_>) -> IResult<(Reg, Reg)> {
@@ -71,7 +72,7 @@ impl Instr {
 
     fn parse_instr(input: Span<'_>) -> IResult<Self> {
         let (input, op_code) = terminated(OpCode::parse, space1)(input)?;
-        let (input, operands) = op_code.kind().parse(input)?;
+        let (input, operands) = cut(|input| op_code.kind().parse(input))(input)?;
 
         Ok((input, Self { op_code, operands }))
     }
@@ -135,7 +136,7 @@ macro_rules! ops {
             pub fn parse<'i>(&self, input: Span<'i>) -> IResult<'i, Operands> {
                 match self {
                     $(
-                        Self::$kind => map($name::parse, Operands::$kind)(input),
+                        Self::$kind => map(context(stringify!(Instr $kind), $name::parse), Operands::$kind)(input),
                     )+
                 }
             }
