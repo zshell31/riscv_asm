@@ -2,18 +2,18 @@ use nom::{
     branch::alt,
     character::complete::{char, space0, space1},
     combinator::{cut, map},
-    error::context,
     sequence::{delimited, terminated},
 };
-use std::fmt::Debug;
+use std::fmt::{self, Debug, Display};
 
 use crate::{
+    error::{AsmError, IResult},
     imm::Imm,
     op_code::OpCode,
     program::Program,
     pseudo::Pseudo,
     reg::Reg,
-    span::{IResult, Span},
+    span::Span,
 };
 
 macro_rules! parse_ops {
@@ -77,7 +77,11 @@ impl Instr {
         Ok((input, Self { op_code, operands }))
     }
 
-    pub fn code(&self, program: &Program, addr: u32) -> anyhow::Result<u32> {
+    pub fn code<'s>(
+        &self,
+        program: &Program<'s>,
+        addr: u32,
+    ) -> Result<u32, AsmError<'s>> {
         let op_code = self.op_code.mask();
         let operands = self.operands.mask(program, addr)?;
 
@@ -86,7 +90,7 @@ impl Instr {
 }
 
 pub trait Mask {
-    fn mask(&self, program: &Program, addr: u32) -> anyhow::Result<u32>;
+    fn mask<'s>(&self, program: &Program<'s>, addr: u32) -> Result<u32, AsmError<'s>>;
 }
 
 macro_rules! op_kind {
@@ -132,18 +136,28 @@ macro_rules! ops {
             )+
         }
 
+        impl Display for OpKind {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str(match self {
+                    $(
+                        Self::$kind => concat!("Instr", stringify!($kind)),
+                    )+
+                })
+            }
+        }
+
         impl OpKind {
             pub fn parse<'i>(&self, input: Span<'i>) -> IResult<'i, Operands> {
                 match self {
                     $(
-                        Self::$kind => map(context(stringify!(Instr $kind), $name::parse), Operands::$kind)(input),
+                        Self::$kind => map($name::parse, Operands::$kind)(input),
                     )+
                 }
             }
         }
 
         impl Mask for Operands {
-            fn mask(&self, program: &Program, addr: u32) -> anyhow::Result<u32> {
+            fn mask<'s>(&self, program: &Program<'s>, addr: u32) -> Result<u32, AsmError<'s>> {
                 match self {
                     $(
                         Self::$kind(instr) => instr.mask(program, addr),
@@ -198,13 +212,13 @@ pub fn bit(imm: u32, idx: u32) -> u32 {
 }
 
 impl Mask for InstrR {
-    fn mask(&self, _: &Program, _: u32) -> anyhow::Result<u32> {
+    fn mask<'s>(&self, _: &Program<'s>, _: u32) -> Result<u32, AsmError<'s>> {
         Ok((self.rs1.idx() << 20) | (self.rs2.idx() << 15) | (self.rd.idx() << 7))
     }
 }
 
 impl Mask for InstrI {
-    fn mask(&self, program: &Program, _: u32) -> anyhow::Result<u32> {
+    fn mask<'s>(&self, program: &Program<'s>, _: u32) -> Result<u32, AsmError<'s>> {
         let imm = (self.imm.resolve(program)? as u32) & 0xfff;
         let rs = self.rs.idx();
         let rd = self.rd.idx();
@@ -214,7 +228,7 @@ impl Mask for InstrI {
 }
 
 impl Mask for InstrS {
-    fn mask(&self, program: &Program, _: u32) -> anyhow::Result<u32> {
+    fn mask<'s>(&self, program: &Program<'s>, _: u32) -> Result<u32, AsmError<'s>> {
         let imm = (self.imm.resolve(program)? as u32) & 0xfff;
 
         Ok((slice(imm, 5, 11) << 25)
@@ -225,7 +239,7 @@ impl Mask for InstrS {
 }
 
 impl Mask for InstrB {
-    fn mask(&self, program: &Program, addr: u32) -> anyhow::Result<u32> {
+    fn mask<'s>(&self, program: &Program<'s>, addr: u32) -> Result<u32, AsmError<'s>> {
         let imm = self.imm.resolve(program)? - (addr as i32);
         let imm = (imm as u32) & 0x1fff;
 

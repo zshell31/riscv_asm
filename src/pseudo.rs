@@ -1,18 +1,18 @@
 pub use literify::literify;
-use nom::{character::complete::alpha0, combinator::map_opt, error::context};
+use nom::{character::complete::alpha0, combinator::map_opt};
 pub use phf::phf_map;
 
 use crate::{
+    error::{AsmError, AsmErrorKind, IResult},
     op_code::OpCode,
-    span::{IResult, Span},
+    span::Span,
 };
 
 impl Pseudo {
     pub fn parse(input: Span<'_>) -> IResult<Self> {
-        context(
-            "Pseudo",
-            map_opt(alpha0, |s: Span<'_>| PSEUDO.get(*s).copied()),
-        )(input)
+        map_opt(alpha0, |s: Span<'_>| PSEUDO.get(*s).copied())(input).map_err(|e| {
+            e.map(|e: AsmError<'_>| e.with_kind(AsmErrorKind::InvalidPseudo))
+        })
     }
 }
 

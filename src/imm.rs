@@ -9,8 +9,9 @@ use nom::{
 };
 
 use crate::{
+    error::{AsmError, AsmErrorKind, IResult},
     program::Program,
-    span::{IResult, Offset, Span},
+    span::{Offset, Span},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -51,6 +52,7 @@ impl Imm {
             )),
             Self::Val,
         )(input)
+        .map_err(|e| e.map(|e: AsmError<'_>| e.with_kind(AsmErrorKind::InvalidImm)))
     }
 
     pub fn parse_sym(input: Span<'_>) -> IResult<Self> {
@@ -86,7 +88,7 @@ impl Imm {
         )(input)
     }
 
-    pub fn resolve(&self, program: &Program) -> anyhow::Result<i32> {
+    pub fn resolve<'s>(&self, program: &Program<'s>) -> Result<i32, AsmError<'s>> {
         match self {
             Self::Val(val) => Ok(*val),
             Self::Sym(sym) => program.resolve(sym),
